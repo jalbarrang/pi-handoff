@@ -56,5 +56,8 @@
     "@earendil-works/pi-coding-agent": {
       "optional": true
     }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
