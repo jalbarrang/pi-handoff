@@ -1,5 +1,12 @@
 # @dreki-gg/pi-handoff
 
+## [0.4.0](https://github.com/jalbarrang/pi-handoff/compare/v0.3.1...v0.4.0) (2026-08-07)
+
+
+### Features
+
+* link handoffs to previous conversations ([18f1d79](https://github.com/jalbarrang/pi-handoff/commit/18f1d79e81200aab2f36f83643fbc1cbb763dcc6))
+
 ## [0.3.1](https://github.com/jalbarrang/pi-handoff/compare/v0.3.0...v0.3.1) (2026-07-12)
 
 
