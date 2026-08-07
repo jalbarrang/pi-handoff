@@ -2,7 +2,9 @@
 
 Transfer context to a new focused [pi](https://github.com/earendil-works/pi-coding-agent) session instead of lossy compaction.
 
-`/handoff` extracts what matters for your next task, generates a self-contained prompt, lets you edit it, and opens a new session (with parent tracking) pre-filled with that prompt.
+`/handoff` extracts the important context for your next task. It generates an editable prompt and opens a new session with parent tracking.
+
+The prompt includes a local link to the previous session JSONL file. The next agent can use `read` or `rg` on this file if the summary omits a detail. Ephemeral sessions do not include this link.
 
 ## Usage
 
@@ -12,4 +14,4 @@ Transfer context to a new focused [pi](https://github.com/earendil-works/pi-codi
 /handoff check other places that need this fix
 ```
 
-Requires interactive mode and a selected model.
+You must use interactive mode and select a model.

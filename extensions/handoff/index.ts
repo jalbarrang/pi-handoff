@@ -12,14 +12,17 @@
  * The generated prompt appears as a draft in the editor for review/editing.
  */
 
-import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { complete, type Message } from '@earendil-works/pi-ai/compat';
-import type { ExtensionAPI, SessionEntry } from '@earendil-works/pi-coding-agent';
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { complete, type Message } from "@earendil-works/pi-ai/compat";
+import type { ExtensionAPI, SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
   BorderedLoader,
   convertToLlm,
   serializeConversation,
-} from '@earendil-works/pi-coding-agent';
+} from "@earendil-works/pi-coding-agent";
 
 const SYSTEM_PROMPT = `You are a context transfer assistant. Given a conversation history and the user's goal for a new thread, generate a focused prompt that:
 
@@ -44,12 +47,12 @@ Files involved:
 [Clear description of what to do next based on user's goal]`;
 
 function entryToMessage(entry: SessionEntry): AgentMessage | undefined {
-  if (entry.type === 'message') {
+  if (entry.type === "message") {
     return entry.message;
   }
-  if (entry.type === 'compaction') {
+  if (entry.type === "compaction") {
     return {
-      role: 'compactionSummary',
+      role: "compactionSummary",
       summary: entry.summary,
       tokensBefore: entry.tokensBefore,
       timestamp: new Date(entry.timestamp).getTime(),
@@ -61,7 +64,7 @@ function entryToMessage(entry: SessionEntry): AgentMessage | undefined {
 function getHandoffMessages(branch: SessionEntry[]): AgentMessage[] {
   let compactionIndex = -1;
   for (let i = branch.length - 1; i >= 0; i--) {
-    if (branch[i].type === 'compaction') {
+    if (branch[i].type === "compaction") {
       compactionIndex = i;
       break;
     }
@@ -72,7 +75,7 @@ function getHandoffMessages(branch: SessionEntry[]): AgentMessage[] {
 
   const compaction = branch[compactionIndex];
   const firstKeptIndex =
-    compaction.type === 'compaction'
+    compaction.type === "compaction"
       ? branch.findIndex((entry) => entry.id === compaction.firstKeptEntryId)
       : -1;
   const compactedBranch = [
@@ -83,23 +86,33 @@ function getHandoffMessages(branch: SessionEntry[]): AgentMessage[] {
   return compactedBranch.map(entryToMessage).filter((message) => message !== undefined);
 }
 
+function appendPreviousConversationLink(prompt: string, sessionFile: string | undefined): string {
+  if (!sessionFile) {
+    return prompt;
+  }
+
+  const transcriptPath = resolve(sessionFile);
+  const transcriptUrl = pathToFileURL(transcriptPath).href;
+  return `${prompt.trimEnd()}\n\n## Previous conversation\nFull pi transcript (JSONL): [\`${transcriptPath}\`](${transcriptUrl})\n\nUse \`read\` or \`rg\` on this file if the summary omits a detail.`;
+}
+
 export default function (pi: ExtensionAPI) {
-  pi.registerCommand('handoff', {
-    description: 'Transfer context to a new focused session',
+  pi.registerCommand("handoff", {
+    description: "Transfer context to a new focused session",
     handler: async (args, ctx) => {
       if (!ctx.hasUI) {
-        ctx.ui.notify('handoff requires interactive mode', 'error');
+        ctx.ui.notify("handoff requires interactive mode", "error");
         return;
       }
 
       if (!ctx.model) {
-        ctx.ui.notify('No model selected', 'error');
+        ctx.ui.notify("No model selected", "error");
         return;
       }
 
       const goal = args.trim();
       if (!goal) {
-        ctx.ui.notify('Usage: /handoff <goal for new thread>', 'error');
+        ctx.ui.notify("Usage: /handoff <goal for new thread>", "error");
         return;
       }
 
@@ -108,7 +121,7 @@ export default function (pi: ExtensionAPI) {
       const messages = getHandoffMessages(ctx.sessionManager.getBranch());
 
       if (messages.length === 0) {
-        ctx.ui.notify('No conversation to hand off', 'error');
+        ctx.ui.notify("No conversation to hand off", "error");
         return;
       }
 
@@ -129,10 +142,10 @@ export default function (pi: ExtensionAPI) {
           }
 
           const userMessage: Message = {
-            role: 'user',
+            role: "user",
             content: [
               {
-                type: 'text',
+                type: "text",
                 text: `## Conversation History\n\n${conversationText}\n\n## User's Goal for New Thread\n\n${goal}`,
               },
             ],
@@ -145,20 +158,20 @@ export default function (pi: ExtensionAPI) {
             { apiKey: auth.apiKey, headers: auth.headers, signal: loader.signal },
           );
 
-          if (response.stopReason === 'aborted') {
+          if (response.stopReason === "aborted") {
             return null;
           }
 
           return response.content
-            .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+            .filter((c): c is { type: "text"; text: string } => c.type === "text")
             .map((c) => c.text)
-            .join('\n');
+            .join("\n");
         };
 
         doGenerate()
           .then(done)
           .catch((err) => {
-            console.error('Handoff generation failed:', err);
+            console.error("Handoff generation failed:", err);
             done(null);
           });
 
@@ -166,15 +179,17 @@ export default function (pi: ExtensionAPI) {
       });
 
       if (result === null) {
-        ctx.ui.notify('Cancelled', 'info');
+        ctx.ui.notify("Cancelled", "info");
         return;
       }
 
+      const handoffPrompt = appendPreviousConversationLink(result, currentSessionFile);
+
       // Let user edit the generated prompt
-      const editedPrompt = await ctx.ui.editor('Edit handoff prompt', result);
+      const editedPrompt = await ctx.ui.editor("Edit handoff prompt", handoffPrompt);
 
       if (editedPrompt === undefined) {
-        ctx.ui.notify('Cancelled', 'info');
+        ctx.ui.notify("Cancelled", "info");
         return;
       }
 
@@ -185,12 +200,12 @@ export default function (pi: ExtensionAPI) {
         parentSession: currentSessionFile,
         withSession: async (replacementCtx) => {
           replacementCtx.ui.setEditorText(editedPrompt);
-          replacementCtx.ui.notify('Handoff ready. Submit when ready.', 'info');
+          replacementCtx.ui.notify("Handoff ready. Submit when ready.", "info");
         },
       });
 
       if (newSessionResult.cancelled) {
-        ctx.ui.notify('New session cancelled', 'info');
+        ctx.ui.notify("New session cancelled", "info");
       }
     },
   });
