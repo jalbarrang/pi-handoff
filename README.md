@@ -14,4 +14,4 @@ The prompt includes a local link to the previous session JSONL file. The next ag
 /handoff check other places that need this fix
 ```
 
-You must use interactive mode and select a model.
+Use pi 0.84 or newer. You must use interactive mode and select a model.
